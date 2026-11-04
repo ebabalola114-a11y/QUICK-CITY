@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#101827">
+<title>QUICK CITY — Lagos 3D Open World</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101827;color:#fff;font-family:Arial,system-ui}
+#game{position:fixed;inset:0}canvas{display:block}
+#top{position:fixed;left:10px;right:10px;top:10px;display:flex;justify-content:space-between;gap:10px;pointer-events:none}
+.card{background:#101827d9;border:1px solid #ffffff25;border-radius:12px;padding:9px 12px;backdrop-filter:blur(8px);font-size:12px;line-height:1.55}
+#brand{font-weight:900;font-size:15px;letter-spacing:.5px}#stats{text-align:right}
+#notice{position:fixed;top:86px;left:50%;transform:translateX(-50%);background:#111827e8;border:1px solid #facc15;border-radius:20px;padding:9px 16px;font-size:12px;text-align:center;max-width:90%;min-width:180px}
+#help{position:fixed;left:10px;bottom:10px;max-width:330px}
+#action{position:fixed;right:14px;bottom:18px;width:86px;height:56px;border:1px solid #ffffff55;border-radius:15px;background:#087f72;color:white;font-weight:bold;font-size:13px}
+#pad{position:fixed;left:12px;bottom:18px;display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,43px);gap:5px}
+button{touch-action:none}
+.dir{border:1px solid #ffffff55;border-radius:12px;background:#17263bcc;color:#fff;font-size:19px;font-weight:bold}
+.blank{visibility:hidden}
+#pedals{position:fixed;right:110px;bottom:18px;display:flex;gap:5px}
+.pedal{height:56px;width:56px;border:1px solid #ffffff55;border-radius:13px;background:#34445c;color:white;font-weight:bold;font-size:11px}
+#gas{background:#a64d0b}
+@media(min-width:800px){#pad,#pedals,#action{opacity:.78}#help{max-width:460px}}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="top">
+ <div class="card"><div id="brand">🌆 QUICK CITY: LAGOS OPEN WORLD</div><div>Explore • Walk • Drive • Discover</div></div>
+ <div class="card" id="stats">₦<span id="money">0</span><br><span id="mode">ON FOOT</span></div>
+</div>
+<div id="notice">Welcome to Lagos! Walk to a vehicle or building and press E.</div>
+<div class="card" id="help">WASD / arrows: move & steer · E: enter/exit car or building · Shift: run · Space: brake</div>
+<div id="pad">
+ <button class="dir blank"></button><button class="dir" data-key="forward">▲</button><button class="dir blank"></button>
+ <button class="dir" data-key="left">◀</button><button class="dir" data-key="back">▼</button><button class="dir" data-key="right">▶</button>
+</div>
+<div id="pedals"><button class="pedal" id="brake">BRAKE</button><button class="pedal" id="gas">GAS</button></div>
+<button id="action">ACTION<br>E</button>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+(()=>{
+const root=document.getElementById('game'),notice=document.getElementById('notice');
+if(!window.THREE){notice.textContent='Could not load the 3D engine. Connect to the internet and reload.';return;}
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x9ac8e4);scene.fog=new THREE.Fog(0x9ac8e4,65,190);
+const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,350);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;root.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xd9edff,0x58604a,2.0));
+const sun=new THREE.DirectionalLight(0xfff0d4,2.4);sun.position.set(-35,65,25);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-90;sun.shadow.camera.right=90;sun.shadow.camera.top=90;sun.shadow.camera.bottom=-90;scene.add(sun);
+const mat=(c,r=.85)=>new THREE.MeshStandardMaterial({color:c,roughness:r});
+const asphalt=mat(0x343a40),concrete=mat(0xb8b7aa),grass=mat(0x587b4a),white=mat(0xf3e8c7),dark=mat(0x202a34),glass= new THREE.MeshStandardMaterial({color:0x79a9bc,metalness:.15,roughness:.25});
+function box(w,h,d,m,x,y,z,cast=true){let o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);o.castShadow=cast;o.receiveShadow=true;scene.add(o);return o}
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(260,260),grass);ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+// Road grid and markings
+for(let z=-100;z<=100;z+=50){box(260,.12,13,asphalt,0,.04,z,false);for(let x=-120;x<125;x+=12)box(5,.025,.22,white,x,.115,z,false)}
+for(let x=-100;x<=100;x+=50){box(13,.12,260,asphalt,x,.045,0,false);for(let z=-120;z<125;z+=12)box(.22,.025,5,white,x,.115,z,false)}
+// Sidewalk strips
+for(let z=-100;z<=100;z+=50){for(let s of [-1,1])box(260,.22,2.2,concrete,0,.12,z+s*8,false)}
+for(let x=-100;x<=100;x+=50){for(let s of [-1,1])box(2.2,.22,260,concrete,x+s*8,.12,0,false)}
+// Buildings, shops, doors and readable labels
+const buildings=[];
+const palettes=[0xd2a77c,0xc6c8c2,0xd8c5a5,0x9daeb1,0xb9a0a0,0xc4b18c,0x9da58d];
+for(let gx=-2;gx<=2;gx++)for(let gz=-2;gz<=2;gz++){
+ if(gx===0||gz===0)continue;
+ let x=gx*50+(gx>0?-13:13),z=gz*50+(gz>0?-13:13);
+ let w=13+(Math.abs(gx*3+gz*7)%7),d=13+(Math.abs(gx*9-gz*2)%7),h=8+(Math.abs(gx*11+gz*5)%4)*3;
+ let color=palettes[Math.abs(gx*7+gz*3)%palettes.length],b=box(w,h,d,mat(color),x,h/2,z);
+ // windows on road-facing front
+ let frontZ=z+d/2+.025;
+ for(let yy=2.4;yy<h-1;yy+=2.4)for(let xx=-w/2+1.7;xx<w/2-1;xx+=3){box(1.25,1.25,.08,glass,x+xx,yy,frontZ,false)}
+ // door and entry trigger
+ let door=box(1.5,2.6,.12,mat(0x533b2b),x,h/2- h/2+1.3,frontZ+.04,false);
+ let sign=box(Math.min(w-1,7),.7,.18,mat([0x0b776a,0xb45309,0x334f9a][(gx+gz+9)%3]),x,h-1.1,frontZ+.08,false);
+ buildings.push({x,z,w,d,h,door,inside:false,name:['CORNER SHOP','LAGOS CAFE','CITY MARKET','REPAIR HUB'][(Math.abs(gx+gz))%4]});
+}
+// decorative kiosks, poles, palms
+for(let i=0;i<24;i++){let x=(i%6-2.5)*34+7,z=(Math.floor(i/6)-1.5)*39+5;if(Math.abs(x%50)<12||Math.abs(z%50)<12)continue;
+ let trunk=new THREE.Mesh(new THREE.CylinderGeometry(.22,.32,4,7),mat(0x765337));trunk.position.set(x,2,z);trunk.castShadow=true;scene.add(trunk);
+ let crown=new THREE.Mesh(new THREE.SphereGeometry(2.2,8,6),mat(0x26723c));crown.position.set(x,4.8,z);crown.scale.y=.55;crown.castShadow=true;scene.add(crown);
+}
+// player capsule-style character
+const player=new THREE.Group();scene.add(player);
+let body=new THREE.Mesh(new THREE.CapsuleGeometry(.48,.9,5,9),mat(0x1d4ed8));body.position.y=1.15;body.castShadow=true;player.add(body);
+let head=new THREE.Mesh(new THREE.SphereGeometry(.34,14,12),mat(0x8f5738));head.position.y=2.05;head.castShadow=true;player.add(head);
+let legs=new THREE.Group();player.add(legs);
+for(let s of [-1,1]){let leg=new THREE.Mesh(new THREE.BoxGeometry(.22,.7,.25),mat(0x252d3b));leg.position.set(s*.19,.38,0);leg.castShadow=true;legs.add(leg)}
+player.position.set(0,0,7);
+// vehicles
+function makeCar(color,x,z,rot=0){
+ let g=new THREE.Group();scene.add(g);g.position.set(x,0,z);g.rotation.y=rot;
+ let shell=new THREE.Mesh(new THREE.BoxGeometry(2.25,.75,4.1),mat(color,.4));shell.position.y=.85;shell.castShadow=true;g.add(shell);
+ let cabin=new THREE.Mesh(new THREE.BoxGeometry(1.72,.8,2.0),glass);cabin.position.set(0,1.55,-.15);cabin.castShadow=true;g.add(cabin);
+ let wheelmat=mat(0x17191d);for(let sx of [-1,1])for(let sz of [-1,1]){let wh=new THREE.Mesh(new THREE.CylinderGeometry(.38,.38,.24,14),wheelmat);wh.rotation.z=Math.PI/2;wh.position.set(sx*1.13,.42,sz*1.35);wh.castShadow=true;g.add(wh)}
+ let lights=mat(0xffe7a0);for(let sx of [-.72,.72]){let l=new THREE.Mesh(new THREE.BoxGeometry(.35,.18,.08),lights);l.position.set(sx,.95,-2.08);g.add(l)}
+ return {group:g,speed:0,color};
+}
+const cars=[makeCar(0xc83d32,-5,5,.2),makeCar(0x245bb4,8,-7,-.4),makeCar(0xe9b72f,3,24,Math.PI)];
+let activeCar=null,mode='walk',money=0,missionTarget=new THREE.Vector3(0,0,-42);
+const marker=new THREE.Mesh(new THREE.TorusGeometry(2.2,.18,8,32),mat(0xffd43b));marker.rotation.x=Math.PI/2;marker.position.copy(missionTarget);marker.position.y=.3;scene.add(marker);
+const keys={};let joy={forward:false,back:false,left:false,right:false,gas:false,brake:false};
+function announce(t){notice.textContent=t}
+function dist(a,b){return Math.hypot(a.x-b.x,a.z-b.z)}
+function nearBuilding(){return buildings.find(b=>Math.abs(player.position.x-b.x)<b.w/2+2.2&&Math.abs(player.position.z-(b.z+b.d/2))<3.2)}
+function action(){
+ if(mode==='interior'){mode='walk';player.visible=true;scene.fog.near=65;scene.fog.far=190;announce('You stepped back outside. Explore the neighbourhood!');return}
+ if(mode==='drive'){mode='walk';player.visible=true;player.position.copy(activeCar.group.position);player.position.x+=2.5;activeCar=null;announce('You exited the vehicle.');return}
+ let c=cars.find(v=>dist(player.position,v.group.position)<4.5);
+ if(c){activeCar=c;mode='drive';player.visible=false;announce('You are driving. Use the arrows/WASD, GAS and BRAKE. Press E to exit.');return}
+ let b=nearBuilding();
+ if(b){mode='interior';player.visible=false;scene.fog.near=100;scene.fog.far=240;announce('Welcome inside the '+b.name+'. Press E to return outside.');return}
+ announce('Move closer to a parked car or a building entrance, then press E.');
+}
+document.getElementById('action').onclick=action;
+window.addEventListener('keydown',e=>{let m={w:'forward',ArrowUp:'forward',s:'back',ArrowDown:'back',a:'left',ArrowLeft:'left',d:'right',ArrowRight:'right',Shift:'run', ' ':'brake'};if(m[e.key]){keys[m[e.key]]=true;e.preventDefault()}if(e.key.toLowerCase()==='e'&&!e.repeat)action()});
+window.addEventListener('keyup',e=>{let m={w:'forward',ArrowUp:'forward',s:'back',ArrowDown:'back',a:'left',ArrowLeft:'left',d:'right',ArrowRight:'right',Shift:'run',' ':'brake'};if(m[e.key])keys[m[e.key]]=false});
+document.querySelectorAll('[data-key]').forEach(btn=>{let k=btn.dataset.key;btn.addEventListener('pointerdown',e=>{e.preventDefault();joy[k]=true;btn.setPointerCapture(e.pointerId)});['pointerup','pointercancel','lostpointercapture'].forEach(ev=>btn.addEventListener(ev,()=>joy[k]=false))});
+for(let [id,k] of [['gas','gas'],['brake','brake']]){let b=document.getElementById(id);b.addEventListener('pointerdown',e=>{e.preventDefault();joy[k]=true;b.setPointerCapture(e.pointerId)});['pointerup','pointercancel','lostpointercapture'].forEach(ev=>b.addEventListener(ev,()=>joy[k]=false))}
+function pressed(k){return !!(keys[k]||joy[k])}
+let clock=new THREE.Clock(),walkPhase=0,missionDone=false;
+function update(dt){
+ const f=pressed('forward')||pressed('gas'),bk=pressed('back'),l=pressed('left'),r=pressed('right');
+ if(mode==='walk'){
+  let v=(keys.run?.13:.075)*(dt*60),dx=(r?1:0)-(l?1:0),dz=(f?1:0)-(bk?1:0);
+  if(dx||dz){let len=Math.hypot(dx,dz);dx/=len;dz/=len;player.position.x+=dx*v;player.position.z-=dz*v;player.rotation.y=Math.atan2(dx,dz);walkPhase+=dt*10;legs.rotation.x=Math.sin(walkPhase)*.45}
+  player.position.x=THREE.MathUtils.clamp(player.position.x,-115,115);player.position.z=THREE.MathUtils.clamp(player.position.z,-115,115);
+  if(dist(player.position,missionTarget)<5&&!missionDone){money+=1000;document.getElementById('money').textContent=money.toLocaleString('en-NG');announce('Mission reached! You earned ₦1,000. A new destination is marked.');missionTarget.set((Math.random()-.5)*130,0,(Math.random()-.5)*130);marker.position.set(missionTarget.x,.3,missionTarget.z)}
+ }else if(mode==='drive'&&activeCar){
+  let car=activeCar;let accel=f?.012:0;car.speed=THREE.MathUtils.clamp(car.speed+accel-(pressed('brake')||bk?.025:.004),-.16,.42);
+  if(l)car.group.rotation.y+=.028*(.3+Math.abs(car.speed)*2);if(r)car.group.rotation.y-=.028*(.3+Math.abs(car.speed)*2);
+  car.group.translateZ(-car.speed*dt*60);
+  car.group.position.x=THREE.MathUtils.clamp(car.group.position.x,-120,120);car.group.position.z=THREE.MathUtils.clamp(car.group.position.z,-120,120);
+ }
+ // camera follows player or car
+ let target=mode==='drive'&&activeCar?activeCar.group:player;
+ if(mode==='interior'){
+  // simple visible interior room near entrance
+  camera.position.lerp(new THREE.Vector3(player.position.x+5,5,player.position.z+8),.06);
+  camera.lookAt(player.position.x,1,player.position.z);return;
+ }
+ let forward=new THREE.Vector3(0,0,-1).applyQuaternion(target.quaternion);
+ let desired=target.position.clone().add(new THREE.Vector3(0,mode==='drive'?7:6,0)).add(forward.clone().multiplyScalar(mode==='drive'?11:9));
+ camera.position.lerp(desired,.09);camera.lookAt(target.position.clone().add(new THREE.Vector3(0,1,0)));
+}
+function animate(){requestAnimationFrame(animate);let dt=Math.min(clock.getDelta(),.04);update(dt);marker.rotation.z+=dt*.9;renderer.render(scene,camera)}
+animate();
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+})();
+</script>
+</body></html>
